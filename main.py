@@ -138,13 +138,23 @@ def main():
                 input_collector.do_listen = False
                 input_collector.serial.cancel_read()
             elif event.type == SERIAL_INPUT_EVENT_TYPE:
-                print(event.key)
+                if event.key == b"u":
+                    snake_x_change = 0
+                    snake_y_change = -1
+                elif event.key == b"r":
+                    snake_x_change = 1
+                    snake_y_change = 0
+                elif event.key == b"d":
+                    snake_x_change = 0
+                    snake_y_change = 1
+                elif event.key == b"l":
+                    snake_x_change = -1
+                    snake_y_change = 0
 
         frames_to_snake_step += 1
         if frames_to_snake_step >= frames_per_snake_step:
             frames_to_snake_step = 0
             move_snake()
-            print("step")
 
         display.fill((0, 0, 0))
         pg.draw.rect(display, (255, 255, 255), (50, 50, 500, 500))
