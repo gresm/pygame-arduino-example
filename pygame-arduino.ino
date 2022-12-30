@@ -1,3 +1,6 @@
+#define RECEIVER_PIN 13
+#define PROTOCOL NEC
+
 #include <IRremote.hpp>
 #include <IRProtocol.h>
 
@@ -65,12 +68,12 @@ const char parseCommand(uint16_t command) {
 
 void setup() {
   Serial.begin(9600);
-  IrReceiver.begin(RECV_PIN, ENABLE_LED_FEEDBACK);
+  IrReceiver.begin(RECEIVER_PIN, ENABLE_LED_FEEDBACK);
 }
 
 void loop() {
   if (IrReceiver.decode()) {
-    if (IrReceiver.decodedIRData.protocol == NEC) {
+    if (IrReceiver.decodedIRData.protocol == PROTOCOL) {
       Serial.print(parseCommand(IrReceiver.decodedIRData.command));
     }
     IrReceiver.resume();
