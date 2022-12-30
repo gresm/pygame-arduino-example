@@ -3,7 +3,9 @@ Example of running simple snake game with pygame and pyserial.
 """
 from __future__ import annotations
 
+from collections import deque
 from threading import Thread
+
 
 import pygame as pg
 import serial
@@ -25,3 +27,29 @@ class SerialInputCollector(Thread):
         while self.do_listen:
             data = self.serial.read()
             pg.event.post(pg.event.Event(SERIAL_INPUT_EVENT_TYPE, {"key": data}))
+
+
+def main():
+    size = (600, 600)
+    display = pg.display.set_mode(size)
+    done = False
+    food = set()
+    snake = deque()
+    snake_x = 25
+    snake_y = 25
+    snake_x_change = 1
+    snake_y_change = 0
+    clock = pg.time.Clock()
+
+    while not done:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                done = True
+
+        display.fill((0, 0, 0))
+        pg.draw.rect(display, (255, 255, 255), (50, 50, 500, 500))
+        clock.tick(60)
+
+
+if __name__ == '__main__':
+    main()
