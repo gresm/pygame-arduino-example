@@ -17,7 +17,7 @@ SERIAL_INPUT_EVENT_TYPE = pg.event.custom_type()
 class SerialInputCollector(Thread):
     def __init__(self):
         super().__init__()
-        self.serial = serial.Serial("dev/ttyUSB0")
+        self.serial = serial.Serial("/dev/ttyUSB0")
         self.do_listen = True
 
         if not self.serial.isOpen():
@@ -40,11 +40,17 @@ def main():
     snake_x_change = 1
     snake_y_change = 0
     clock = pg.time.Clock()
+    input_collector = SerialInputCollector()
+    input_collector.start()
 
     while not done:
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 done = True
+                input_collector.do_listen = False
+                input_collector.serial.cancel_read()
+            elif event.type == SERIAL_INPUT_EVENT_TYPE:
+                print(event.key)
 
         display.fill((0, 0, 0))
         pg.draw.rect(display, (255, 255, 255), (50, 50, 500, 500))
