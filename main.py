@@ -104,10 +104,10 @@ def game(display: pg.Surface, clock: pg.time.Clock):
     snake_y_change = 0
     food_eat_cycle = 0
     required_food = 2
-    frames_per_snake_step = 60
+    frames_per_snake_step = 30
     frames_to_snake_step = 0
     snake_step_increment = 2
-    snake_min_fp_step = 30
+    snake_min_fp_step = 4
     snake_alive = True
     player_won = False
     dead_show_red = False
