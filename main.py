@@ -72,6 +72,7 @@ class SerialInputCollector(Thread):
 
 @catch_errors(lambda: SerialInputCollector.collector.stop() if SerialInputCollector.collector else None)
 def main():
+    pg.init()
     size = (600, 600)
     display = pg.display.set_mode(size)
     clock = pg.time.Clock()
@@ -94,11 +95,16 @@ def game(display: pg.Surface, clock: pg.time.Clock):
     snake_x_change = 1
     snake_y_change = 0
     food_eat_cycle = 0
-    required_food = 1
+    required_food = 2
     frames_per_snake_step = 30
     frames_to_snake_step = 0
     snake_alive = True
     dead_show_red = False
+    font = pg.font.SysFont("", 30)
+    death_message = "You have died. PRESS OK to play again."
+    death_surface = font.render(death_message, False, (127, 127, 127))
+    death_rect = death_surface.get_rect()
+    death_rect.center = (size[0] // 2, size[1] - 25)
 
     def check_pos(x: int, y: int, do_food: bool):
         if not (0 <= x < board_size[0]) or not (0 <= y < board_size[1]):
@@ -205,6 +211,13 @@ def game(display: pg.Surface, clock: pg.time.Clock):
                     snake_movement(0, 1)
                 elif event.key == b"l":
                     snake_movement(-1, 0)
+                elif event.key == b"*":
+                    snake_alive = False
+                elif event.key == b"#":
+                    return False
+                elif event.key == b"o":
+                    if not snake_alive:
+                        return True
 
         frames_to_snake_step += 1
         if frames_to_snake_step >= frames_per_snake_step:
@@ -223,8 +236,10 @@ def game(display: pg.Surface, clock: pg.time.Clock):
         for segment in snake:
             pg.draw.rect(display, (0, 255, 0), ((segment[0] + 5) * 10, (segment[1] + 5) * 10, 10, 10))
 
-        if (not snake_alive) and dead_show_red:
-            pg.draw.rect(display, (255, 0, 0), ((snake_x + 5) * 10, (snake_y + 5) * 10, 10, 10))
+        if not snake_alive:
+            display.blit(death_surface, death_rect)
+            if dead_show_red:
+                pg.draw.rect(display, (255, 0, 0), ((snake_x + 5) * 10, (snake_y + 5) * 10, 10, 10))
 
         pg.display.flip()
         clock.tick(60)
