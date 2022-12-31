@@ -7,34 +7,85 @@ from collections import deque
 from threading import Thread
 from random import randint
 
+# Crash handling to prevent not killed processes.
+import apport_python_hook
+import sys
 
 import pygame as pg
 import serial
+
+
+def catch_errors(trigger):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            try:
+                func(*args, **kwargs)
+            except Exception as exc:
+                # Call trigger
+                trigger()
+                # Print traceback
+                apport_python_hook.apport_excepthook(exc.__class__, exc, exc.__traceback__)
+                # Stop python
+                sys.exit(1)
+        return wrapper
+    return decorator
 
 
 SERIAL_INPUT_EVENT_TYPE = pg.event.custom_type()
 
 
 class SerialInputCollector(Thread):
+    collector: SerialInputCollector | None = None
+
     def __init__(self):
         super().__init__()
         self.serial = serial.Serial("/dev/ttyUSB0")
-        self.do_listen = True
+        self.do_listen = False
 
         if not self.serial.isOpen():
             self.serial.open()
+
+    def __new__(cls, *args, **kwargs):
+        """
+        Allow only one listener.
+        :param args:
+        :param kwargs:
+        """
+        if cls.collector is None or not cls.collector.do_listen:
+            ret = super().__new__(cls, *args, **kwargs)
+            cls.collector = ret
+        return cls.collector
+
+    def start(self):
+        self.do_listen = True
+        super().start()
 
     def run(self):
         while self.do_listen:
             data = self.serial.read()
             pg.event.post(pg.event.Event(SERIAL_INPUT_EVENT_TYPE, {"key": data}))
 
+    def stop(self):
+        self.do_listen = False
+        self.serial.cancel_read()
 
+
+@catch_errors(lambda: SerialInputCollector.collector.stop() if SerialInputCollector.collector else None)
 def main():
     size = (600, 600)
-    board_size = ((600 // 10) - 10, (600 // 10) - 10)
     display = pg.display.set_mode(size)
-    done = False
+    clock = pg.time.Clock()
+    input_collector = SerialInputCollector()
+    input_collector.start()
+    playing = game(display, clock)
+    while playing:
+        playing = game(display, clock)
+    input_collector.stop()
+
+
+def game(display: pg.Surface, clock: pg.time.Clock):
+    size = display.get_size()
+    board_size = ((size[0] // 10) - 10, (size[1] // 10) - 10)
     food = {(26, 25)}
     snake = deque([(25, 25)])
     snake_segments: set[tuple[int, int]] = {(25, 25)}
@@ -46,9 +97,8 @@ def main():
     required_food = 1
     frames_per_snake_step = 30
     frames_to_snake_step = 0
-    clock = pg.time.Clock()
-    input_collector = SerialInputCollector()
-    input_collector.start()
+    snake_alive = True
+    dead_show_red = False
 
     def check_pos(x: int, y: int, do_food: bool):
         if not (0 <= x < board_size[0]) or not (0 <= y < board_size[1]):
@@ -99,7 +149,7 @@ def main():
                 possible_add((x, y + 1))
 
         # TODO: finish flood fill
-        return
+        return False
         populate_possible()
         while len(possible):
             goto = possible.copy()
@@ -116,8 +166,6 @@ def main():
         snake_x += snake_x_change
         snake_y += snake_y_change
         snake_head = (snake_x, snake_y)
-        snake.append(snake_head)
-        snake_segments.add(snake_head)
         if snake_head in food:
             food.remove(snake_head)
             spawn_food()
@@ -131,30 +179,40 @@ def main():
         else:
             snake_segments.remove(snake.popleft())
 
-    while not done:
+        ret = check_pos(snake_x, snake_y, False)
+        snake.append(snake_head)
+        snake_segments.add(snake_head)
+
+        return ret
+
+    def snake_movement(x_change: int, y_change: int):
+        nonlocal snake_x_change, snake_y_change
+        if x_change * -1 == snake_x_change and y_change * -1 == snake_y_change:
+            return  # Can't move snake to itself
+        snake_x_change = x_change
+        snake_y_change = y_change
+
+    while True:
         for event in pg.event.get():
             if event.type == pg.QUIT:
-                done = True
-                input_collector.do_listen = False
-                input_collector.serial.cancel_read()
+                return False
             elif event.type == SERIAL_INPUT_EVENT_TYPE:
                 if event.key == b"u":
-                    snake_x_change = 0
-                    snake_y_change = -1
+                    snake_movement(0, -1)
                 elif event.key == b"r":
-                    snake_x_change = 1
-                    snake_y_change = 0
+                    snake_movement(1, 0)
                 elif event.key == b"d":
-                    snake_x_change = 0
-                    snake_y_change = 1
+                    snake_movement(0, 1)
                 elif event.key == b"l":
-                    snake_x_change = -1
-                    snake_y_change = 0
+                    snake_movement(-1, 0)
 
         frames_to_snake_step += 1
         if frames_to_snake_step >= frames_per_snake_step:
             frames_to_snake_step = 0
-            move_snake()
+            if snake_alive:
+                snake_alive = move_snake()
+            else:
+                dead_show_red = not dead_show_red
 
         display.fill((0, 0, 0))
         pg.draw.rect(display, (255, 255, 255), (50, 50, 500, 500))
@@ -164,6 +222,9 @@ def main():
 
         for segment in snake:
             pg.draw.rect(display, (0, 255, 0), ((segment[0] + 5) * 10, (segment[1] + 5) * 10, 10, 10))
+
+        if (not snake_alive) and dead_show_red:
+            pg.draw.rect(display, (255, 0, 0), ((snake_x + 5) * 10, (snake_y + 5) * 10, 10, 10))
 
         pg.display.flip()
         clock.tick(60)
