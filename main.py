@@ -19,8 +19,8 @@ def catch_errors(trigger):
     def decorator(func):
         def wrapper(*args, **kwargs):
             try:
-                func(*args, **kwargs)
-            except Exception as exc:
+                return func(*args, **kwargs)
+            except BaseException as exc:
                 # Call trigger
                 trigger()
                 # Print traceback
@@ -70,7 +70,12 @@ class SerialInputCollector(Thread):
         self.serial.cancel_read()
 
 
-@catch_errors(lambda: SerialInputCollector.collector.stop() if SerialInputCollector.collector else None)
+def on_error():
+    if SerialInputCollector.collector is not None:
+        SerialInputCollector.collector.stop()
+
+
+@catch_errors(on_error)
 def main():
     pg.init()
     size = (600, 600)
